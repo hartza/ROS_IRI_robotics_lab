@@ -1,0 +1,6 @@
+
+
+class PmdRGB {
+public:
+  
+};
