@@ -48,6 +48,7 @@ namespace pmd_camcube
     */
 //    void readData (pcl::PointCloud<pcl::PointXYZRGB> cloud);
     void readData (sensor_msgs::PointCloud &cloud);
+//    void readData (sensor_msgs::PointCloud2 &cloud);
     
 //     std::string device_id_;
 //     std::string lib_version_;

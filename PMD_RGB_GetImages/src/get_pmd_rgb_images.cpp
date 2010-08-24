@@ -4,14 +4,15 @@
 //#include <sensor_msgs/PointCloud2.h>
 #include "pcl/ModelCoefficients.h"
 
-//CAMCUBE
-#include "camcube.h"
+
 
 #include "pcl/io/pcd_io.h"
 #include "pcl/point_types.h"
 
 #include "sensor_msgs/point_cloud_conversion.h"
 //#include <point_cloud_converter/conversion.h>
+#include "sensor_msgs/Image.h"
+
 
 #include <cmath>
 
@@ -27,22 +28,67 @@ Agafa una imatge de color, llegeix un nuvol de punts i posa color als punts
 */
 
 
-  
+PmdRGB::PmdRGB(ros::NodeHandle &n) : 
+  n_(n), it_(n_) 
+{ 
+  image_sub_ = it_.subscribe("image_topic", 1, &PmdRGB::imageCallback, this);
+
+  pmdCC_ = new pmd_camcube::PmdCamcube();
+  integration_time_=600;
+  calibration_on_ = true;
+  initialised_ = false;
+}
+
+PmdRGB::~PmdRGB() {
+  if (initialised_)
+    pmdCC_->close();
+}
+
+void PmdRGB::initialise() {
+  pmdCC_->open(integration_time_,calibration_on_);
+  initialised_ = true;
+}
+
+void PmdRGB::imageCallback (const sensor_msgs::ImageConstPtr& msg_ptr) {
+  ROS_INFO("New RGB Image %d x %d",msg_ptr->width,msg_ptr->height);
+}
+//PmdRGB::getData(sensor_msgs::PointCloud2 &cloud2) {  
+//    pmdCC_->readData(cloud); 
+//    sensor_msgs::convertPointCloudToPointCloud2(cloud,cloud2);
+//}
+
+void PmdRGB::getData(sensor_msgs::PointCloud &cloud) {  
+  pmdCC_->readData(cloud);
+}
+
+void PmdRGB::setIntegrationTime(int integration_time) {
+  integration_time_ = integration_time;
+}
+
+void PmdRGB::setCalibration (bool calibration_on) {
+  calibration_on_ = calibration_on;
+}
+
 int main( int argc, char** argv )
 {
-//TODO: sembla que en Ros la càmera hauria de ser un servei apart!
+  
+  
+  
+  
+  //TODO: sembla que en Ros la càmera hauria de ser un servei apart!
   bool bSaveFile=false;
   
-  pmd_camcube::PmdCamcube * pmdCC = new pmd_camcube::PmdCamcube();
-  
+
   ros::init(argc, argv, "point_clouds");
   ros::NodeHandle n;
-  ros::Publisher marker_pub = n.advertise<sensor_msgs::PointCloud>("visualization_point_cloud", 10);
+//  ros::Publisher marker_pub = n.advertise<sensor_msgs::PointCloud>("visualization_point_cloud", 10);
+  ros::Publisher marker_pub = n.advertise<sensor_msgs::PointCloud2>("visualization_point_cloud", 10);
   ros::Rate r(30);
 
-   ROS_INFO("Open camera connection");
-  pmdCC->open(600,true);   
-
+  ROS_INFO("Open camera connection");
+  PmdRGB * pPmdRGB = new PmdRGB(n);
+  pPmdRGB->initialise();   
+  
   //a veure si funciona amb pointclouds
   //pcl::PointCloud<pcl::PointXYZ> cloud;
 
@@ -59,15 +105,17 @@ int main( int argc, char** argv )
   int image_counter=0;
   while (ros::ok())
   {
-    pmdCC->readData(cloud);
+   // pmdCC->readData(cloud);
+   pPmdRGB->getData(cloud);
     //una mica recargolat no?
 //    point_cloud::toMsg (cloudXYZ,cloud2);
     //point_cloud::toMsg (cloudXYZ,cloud2);
     //point_cloud_converter::convert(cloud2,cloud);
+  sensor_msgs::convertPointCloudToPointCloud2(cloud,cloud2);
 
-
+  ROS_INFO("New image");
     //publish the result
-    marker_pub.publish(cloud);
+    marker_pub.publish(cloud2);
     if (bSaveFile) {
 	  sensor_msgs::convertPointCloudToPointCloud2(cloud,cloud2);
       // Convert to the templated message type
@@ -87,7 +135,7 @@ int main( int argc, char** argv )
  
   }
   ROS_INFO("Close camera connection");
-  pmdCC->close();
+  delete pPmdRGB;
   return(0);
 }
 
